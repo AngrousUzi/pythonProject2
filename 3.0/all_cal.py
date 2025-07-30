@@ -4,7 +4,7 @@ from cal_return import get_complete_return
 import pandas as pd 
 import datetime as dt
 import numpy as np
-
+import os
 def get_composites(index_code):
     composites = pd.DataFrame()
     composites['full_code'] = pd.read_excel(f'index/{index_code}.xlsx')['证券代码']
@@ -37,35 +37,36 @@ def all_cal(index_code,df_constant,composites,start,end,freq,workday_list,period
     final_r2_index_result={}
     final_r2_industry_result={}
     processing_count=0
+    if not os.path.exists("temp"):
+        os.makedirs("temp")
     for full_code in composite_list:
         industry_code=composites.loc[composites['full_code']==full_code,'index'].values[0]
-        if method=="simple":
-            results=single_periodic_cal(full_code=full_code,df_index=df_constant[index_code],df_industry=df_constant[industry_code],start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
-            results.to_csv(f"temp/{full_code}.csv")
-            final_r2_result[full_code]=results
-
-        elif method=="cross_section":
-            df_r2,df_beta_index,df_beta_industry=single_periodic_cal(full_code=full_code,df_index=df_constant[index_code],df_industry=df_constant[industry_code],start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
-            df_r2.to_csv(f"temp/{full_code}.csv")
-            final_r2_result[full_code]=df_r2
-        else:
-            raise ValueError(f"method {method} not supported")
+        df_r2,df_beta_index,df_beta_industry=single_periodic_cal(full_code=full_code,df_index=df_constant[index_code],df_industry=df_constant[industry_code],start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
         
+        final_r2_result[full_code]=df_r2
+        if df_r2 is not None:
+            df_r2.to_csv(f"temp/{full_code}.csv")
+
         processing_count+=1
         # if processing_count%10==5: 
-        print(full_code)
+        print(full_code,processing_count)
             # break
     summed_df = sum_df(final_r2_result)
 
     return summed_df
 
-def sum_df(result_dict):
+def sum_df(r2_result_dict,beta_index_result_dict=None,beta_industry_result_dict=None):
     summed_df = None
-    for key,df in result_dict.items():
+    no_data_list=[]
+    for key,df in r2_result_dict.items():
         if summed_df is None:
             summed_df = df.copy()
         else:
-            summed_df = summed_df.add(df, fill_value=0)
+            if df is not None:
+                summed_df = summed_df.add(df, fill_value=0)
+            else:
+                no_data_list.append(key)
+    print(f"No data when summing up: {no_data_list}")
     return summed_df
 
 def continue_cal(index_code,df_constant,composites,start,end,freq,workday_list,period,method,continue_code):
@@ -76,8 +77,13 @@ def continue_cal(index_code,df_constant,composites,start,end,freq,workday_list,p
     all_cal(index_code=index_code,df_constant=df_constant,composites=composites_continue,start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
     results_dict={}
     for full_code in composites["full_code"].tolist():
-        results=pd.read_csv(f"temp/{full_code}.csv")
-        results_dict[full_code]=results
+        try:
+            results=pd.read_csv(f"temp/{full_code}.csv")
+            results_dict[full_code]=results
+        except FileNotFoundError:
+            print(f"temp/{full_code}.csv not found")
+            results_dict[full_code]=None
+            continue
     return sum_df(results_dict)     
 
 if __name__=="__main__":

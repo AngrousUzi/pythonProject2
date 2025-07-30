@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import datetime as dt
+import os
 
 
 def get_data(start:dt.datetime=None,end:dt.datetime=None,exg:str=None,full_code:str=None,workday_list:list=None):
@@ -52,7 +53,9 @@ def get_data(start:dt.datetime=None,end:dt.datetime=None,exg:str=None,full_code:
                 continue
         if len(error_list)>0:
             print(f"{full_code} on {error_list} is not found.")
-            with open(f"error_list/{full_code}_error_list.txt","w") as f:
+            if not os.path.exists("error_list"):
+                os.makedirs("error_list")
+            with open(f"error_list/{full_code}_missing_list.txt","w") as f:
                 for date in error_list:
                     f.write(str(date)+"\n")
     # df_stock.to_csv("SAMPL.csv")

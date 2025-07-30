@@ -105,6 +105,6 @@ def resample(df,freq,is_index,stock_code,workday_list,error_list,**kwargs):
     return df_resampled
 if __name__=="__main__":
     from get_data import get_data
-    df_all=get_data(start=dt.datetime(2024,9,24),end=dt.datetime(2024,12,30),exg="SZ",full_code="SZ002352")
+    df_all=get_data(start=dt.datetime(2024,9,24),end=dt.datetime(2024,10,10),exg="SZ",full_code="SZ002352")
     df_r=resample(df_all[0],freq="10min",is_index=False,stock_code="002352",workday_list=df_all[1],error_list=df_all[2])
     df_r.to_csv('resample_test.csv')

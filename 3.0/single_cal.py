@@ -142,18 +142,21 @@ def single_periodic_cal(full_code,df_index,df_industry,start,end,freq,workday_li
     '''
     df_stock,_,error_list=get_complete_return(full_code,start,end,freq,workday_list,False)
     # df_stock.to_csv('temp_stock.csv')
-
+    if df_stock is None:
+        return None,None,None
     if method=="simple":
-        results=pd.DataFrame()
+        r2s=pd.DataFrame(columns=[0])
+        beta_indexs=pd.DataFrame(columns=[0])
+        beta_industrys=pd.DataFrame(columns=[0])
         if period=="full":
             simple_cal_result=simple_cal(df_stock,df_index,df_industry,full_code)
-            results.loc[start,'r2']=simple_cal_result[0]
-            results.loc[start,'beta_index']=simple_cal_result[1]
-            results.loc[start,'beta_industry']=simple_cal_result[2]
-            return results
+            r2s.loc[start,0]=simple_cal_result[0]
+            beta_indexs.loc[start,0]=simple_cal_result[1]
+            beta_industrys.loc[start,0]=simple_cal_result[2]
+            return r2s,beta_indexs,beta_industrys
         
-
         period=int(period)
+
         for period_start,period_end in zip(workday_list[::period],workday_list[period::period]):
             # 对于pd.date_range(start,end) 包含start和end 因此在选择的时候需要不包含end中的日期
             # period_end=dt.datetime.strptime(str(period_start),"%Y-%m-%d %H:%M:%S")+dt.timedelta(days=period)-dt.timedelta(seconds=1)
@@ -168,10 +171,10 @@ def single_periodic_cal(full_code,df_index,df_industry,start,end,freq,workday_li
             # df_stock_period.to_csv(f'temp/{period_start.date()}_{period_end.date()}.csv')
             
             r2,beta_index,beta_industry=simple_cal(df_stock_period,df_index_period,df_industry_period,full_code)
-            results.loc[period_start,'r2']=r2
-            results.loc[period_start,'beta_index']=beta_index
-            results.loc[period_start,'beta_industry']=beta_industry
-        return results
+            r2s.loc[period_start,0]=r2
+            beta_indexs.loc[period_start,0]=beta_index
+            beta_industrys.loc[period_start,0]=beta_industry
+        return r2s,beta_indexs,beta_industrys
     
     elif method=="cross_section":
         freq_num = int(''.join(filter(str.isdigit, str(freq))))
@@ -206,8 +209,11 @@ def single_periodic_cal(full_code,df_index,df_industry,start,end,freq,workday_li
             beta_indexs_all.loc[period_start]=beta_indexs
             beta_industrys_all.loc[period_start]=beta_industrys
 
-
         return r2s_all,beta_indexs_all,beta_industrys_all
+
+    else:
+        raise ValueError(f"method {method} not supported")
+
 
 if __name__=="__main__":
     start=dt.datetime(2024,1,1)

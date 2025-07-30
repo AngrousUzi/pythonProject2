@@ -2,6 +2,7 @@ import pandas as pd
 from get_data import get_data
 from resample import resample
 import datetime as dt
+
 def cal_return(df) -> pd.Series:
     """
     计算股票收益率函数
@@ -66,7 +67,11 @@ def get_complete_return(full_code:str,start:dt.datetime,end:dt.datetime,freq:str
 
 
 if __name__=="__main__":
-    _,workday_list,error_list=get_complete_return(full_code="SH000001",start=dt.datetime(2024,7,1),end=dt.datetime(2024,12,30),freq="10min",workday_list=None,is_index=True)
-    df_return,workday_list,error_list=get_complete_return(full_code="SZ002352",start=dt.datetime(2024,7,1),end=dt.datetime(2024,12,30),freq="10min",workday_list=workday_list,is_index=False)
+    start=dt.datetime(2024,9,24)
+    end=dt.datetime(2024,10,10)
+    df_index_return,workday_list,error_list=get_complete_return(full_code="SH000001",start=start,end=end,freq="10min",workday_list=None,is_index=True)
+    df_index_return.to_csv("index_return_test.csv")
+    df_return,workday_list,error_list=get_complete_return(full_code="SH600000",start=start,end=end,freq="10min",workday_list=workday_list,is_index=False)
+    # df_return.to_csv("return_test.csv")
     print(error_list)
     df_return.to_csv("return_test.csv")
