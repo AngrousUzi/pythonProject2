@@ -12,7 +12,7 @@ def resample(df,freq,is_index,stock_code,workday_list,error_list,**kwargs):
     
     参数:
     df (pd.DataFrame): 需要重采样的DataFrame，以Time (format:datetime) 为index,Price列位
-    freq (str): 重采样频率，如"3min", "5min"等
+    freq (str): "3min", "5min", "10min", "30min", "12h"（日内连续交易阶段收益）
     
     返回:
     pd.DataFrame: 重采样后的DataFrame
@@ -103,8 +103,8 @@ def resample(df,freq,is_index,stock_code,workday_list,error_list,**kwargs):
 
 
     return df_resampled
-if __name__=="__main__":
+if __name__=="__main__":    
     from get_data import get_data
     df_all=get_data(start=dt.datetime(2024,9,24),end=dt.datetime(2024,10,10),exg="SZ",full_code="SZ002352")
-    df_r=resample(df_all[0],freq="10min",is_index=False,stock_code="002352",workday_list=df_all[1],error_list=df_all[2])
+    df_r=resample(df_all[0],freq="45min",is_index=False,stock_code="002352",workday_list=df_all[1],error_list=df_all[2])
     df_r.to_csv('resample_test.csv')

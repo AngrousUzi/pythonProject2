@@ -74,49 +74,59 @@ def parse_timedelta(time_str):
         # 不支持的时间单位，抛出异常
         raise ValueError(f"Unsupported period: {time_str}")
 
-def simple_cal(df_stock,df_index,df_industry,full_code):
+def simple_cal(df_stock,df_X,full_code):
     # 无法回归
-    if df_index.shape[0]<=1: return np.nan,np.nan,np.nan
-    
+    # df_index=df_X.iloc[:,0]
+    if df_X.shape[0] <= 1:
+        nan_series = pd.Series(np.nan, index=df_X.columns)
+        return {"r2": np.nan, "betas": nan_series}
+    # if len(X_names)>1:
+        # df_industry=df_X.iloc[:,1]
     # 数据对齐
 
 
-    if df_stock.shape[0]<df_index.shape[0] or df_stock.shape[0]<df_industry.shape[0]:
-        log_error(f'{full_code} 数据长度不一致,start:{df_index.index[0]},end:{df_index.index[-1]}',full_code)
-        log_error(f'stock_length:{df_stock.shape[0]},index_length:{df_index.shape[0]},industry_length:{df_industry.shape[0]}',full_code)
-        missing_set=set(df_index.index.values)-set(df_stock.index.values)
+    if df_stock.shape[0]<df_X.shape[0]:
+        log_error(f'{full_code} 数据长度不一致,start:{df_X.index[0]},end:{df_X.index[-1]}',full_code)
+        log_error(f'stock_length:{df_stock.shape[0]},index_length:{df_X.shape[0]}',full_code)
+        missing_set=set(df_X.index.values)-set(df_stock.index.values)
         if len(missing_set)<3:
             log_error(f'缺少的index为{missing_set}',full_code)
         df_stock.to_csv(f'error_list/return/{full_code}.csv')
-        if df_stock.shape[0]<=1: return np.nan,np.nan,np.nan
-        df_index=df_index.loc[df_stock.index].copy()
-        df_industry=df_industry.loc[df_stock.index].copy() 
-    elif df_stock.shape[0]>df_index.shape[0] or df_stock.shape[0]>df_industry.shape[0]:
-        log_error(f'{full_code} 数据长度不一致,stock_length:{df_stock.shape[0]},index_length:{df_index.shape[0]},industry_length:{df_industry.shape[0]}',full_code)
-        missing_set=set(df_index.index.values)-set(df_stock.index.values)
+        if df_stock.shape[0]<=1: return {"r2":np.nan,"betas":[np.nan for _ in df_X.columns]}
+        df_X=df_X.loc[df_stock.index].copy()
+        # df_industry=df_industry.loc[df_stock.index].copy() 
+    elif df_stock.shape[0]>df_X.shape[0]:
+        log_error(f'{full_code} 数据长度不一致,stock_length:{df_stock.shape[0]},index_length:{df_X.shape[0]}',full_code)
+        missing_set=set(df_X.index.values)-set(df_stock.index.values)
         if len(missing_set)<3:
             log_error(f'缺少的index为{missing_set}',full_code)
-        df_index=df_index.loc[df_stock.index].copy()
-        df_industry=df_industry.loc[df_stock.index].copy()
+        df_X=df_X.loc[df_stock.index].copy()
+        # df_industry=df_industry.loc[df_stock.index].copy()
+
+
 
     Y=df_stock
-    X=pd.concat([df_index,df_industry],axis=1)
+    X=df_X
     X=sm.add_constant(X)
+
+    # print(Y,X)
+
     model=sm.OLS(Y,X)
     results=model.fit()
     r2=results.rsquared
     params=results.params
     # try:
-    beta_index=params.iloc[1]
-    beta_industry=params.iloc[2]
     # except IndexError:
         # print(results.summary())
-    return r2,beta_index,beta_industry
+    # print(type(params))
+    # print(r2,params)
+    return {"r2":r2,"betas":params[1:]}
 
-def simple_cross_section_cal(df_stock,df_index,df_industry,full_code,total_num):
+def simple_cross_section_cal(df_stock,df_X,full_code,total_num):
     r2s=pd.Series()
-    beta_indexs=pd.Series()
-    beta_industrys=pd.Series()
+
+    X_cols=df_X.columns
+    betas_dict={col:pd.Series() for col in X_cols}
     
 
     for nth in range(total_num):
@@ -124,115 +134,103 @@ def simple_cross_section_cal(df_stock,df_index,df_industry,full_code,total_num):
             # 选取每天的第x个元素（例如第一个元素）
             # 这里以选取每天的第一个元素为例
         df_stock_nth= df_stock.groupby(df_stock.index.date).nth(nth)
-        df_index_nth= df_index.groupby(df_index.index.date).nth(nth)
-        df_industry_nth= df_industry.groupby(df_industry.index.date).nth(nth)
+        df_X_nth= df_X.groupby(df_X.index.date).nth(nth)
         # df_stock_period.to_csv(f'temp/{period_start.date()}_{period_end.date()}.csv')
         
-        r2,beta_index,beta_industry=simple_cal(df_stock_nth,df_index_nth,df_industry_nth,full_code)
-        r2s[nth]=r2
-        beta_indexs[nth]=beta_index
-        beta_industrys[nth]=beta_industry
+        simple_cal_result=simple_cal(df_stock_nth,df_X_nth,full_code)
+        # print(simple_cal_result)
+        r2s[nth]=simple_cal_result["r2"]
+        for col in X_cols:
+            betas_dict[col][nth]=simple_cal_result["betas"][col]
     # r2s,beta_indexs,beta_industrys=simple_cal(full_code,df_index,df_industry,start,end,freq,workday_list,period,method="cross_section")
-    return r2s,beta_indexs,beta_industrys
+    return {"r2":r2s,"betas":betas_dict}
 
-def single_periodic_cal(full_code,df_index,df_industry,start,end,freq,workday_list,period:int,method):
+def single_periodic_cal(full_code,df_X,start,end,freq,workday_list,period:int,method):
     ''''
         如果method=="
 
     '''
+    X_cols=df_X.columns
+
     df_stock,_,error_list=get_complete_return(full_code,start,end,freq,workday_list,False)
     # df_stock.to_csv('temp_stock.csv')
     if df_stock is None:
-        return None,None,None
-    if method=="simple":
-        r2s=pd.DataFrame(columns=[0])
-        beta_indexs=pd.DataFrame(columns=[0])
-        beta_industrys=pd.DataFrame(columns=[0])
-        if period=="full":
-            simple_cal_result=simple_cal(df_stock,df_index,df_industry,full_code)
-            r2s.loc[start,0]=simple_cal_result[0]
-            beta_indexs.loc[start,0]=simple_cal_result[1]
-            beta_industrys.loc[start,0]=simple_cal_result[2]
-            return r2s,beta_indexs,beta_industrys
-        
+        return None
+ 
+    if period=="full":
+        period=len(workday_list)-1
+    else:
         period=int(period)
-
-        for period_start,period_end in zip(workday_list[::period],workday_list[period::period]):
-            # 对于pd.date_range(start,end) 包含start和end 因此在选择的时候需要不包含end中的日期
-            # period_end=dt.datetime.strptime(str(period_start),"%Y-%m-%d %H:%M:%S")+dt.timedelta(days=period)-dt.timedelta(seconds=1)
-            # period_end=dt.datetime.strftime(period_end,"%Y-%m-%d %H:%M:%S")
-            # print(period_start,period_end)
-            df_index_period=df_index.loc[period_start:period_end]
-            #对于选取1天的情况，可能出现的问题
-            if df_index_period.shape[0]==0: continue
-            df_industry_period=df_industry.loc[period_start:period_end]
-            df_stock_period=df_stock.loc[period_start:period_end]
-            
-            # df_stock_period.to_csv(f'temp/{period_start.date()}_{period_end.date()}.csv')
-            
-            r2,beta_index,beta_industry=simple_cal(df_stock_period,df_index_period,df_industry_period,full_code)
-            r2s.loc[period_start,0]=r2
-            beta_indexs.loc[period_start,0]=beta_index
-            beta_industrys.loc[period_start,0]=beta_industry
-        return r2s,beta_indexs,beta_industrys
     
+    if method=="simple":
+        total_num=1
+        # r2s=pd.DataFrame(columns=[0])
+        # betas_dict={col:pd.DataFrame(columns=[0]) for col in X_cols}
     elif method=="cross_section":
         freq_num = int(''.join(filter(str.isdigit, str(freq))))
         total_num = 240 // freq_num +1
-
-        r2s_all=pd.DataFrame(columns=range(total_num))
-        beta_indexs_all=pd.DataFrame(columns=range(total_num))
-        beta_industrys_all=pd.DataFrame(columns=range(total_num))
-        if period=="full":
-            r2s,beta_indexs,beta_industrys=simple_cross_section_cal(df_stock,df_index,df_industry,full_code,total_num)
-            r2s=pd.DataFrame(r2s.rename(start)).T
-            beta_indexs=pd.DataFrame(beta_indexs.rename(start)).T
-            beta_industrys=pd.DataFrame(beta_industrys.rename(start)).T
-            return r2s,beta_indexs,beta_industrys
-        
-
-        period=int(period)
-
-        for period_start,period_end in zip(workday_list[::period],workday_list[period::period]):
-            
-            # 对于pd.date_range(start,end) 包含start和end 因此在选择的时候需要不包含end中的日期
-            # period_end=dt.datetime.strptime(str(period_start),"%Y-%m-%d %H:%M:%S")+parse_timedelta(period)-dt.timedelta(seconds=1)
-            # period_end=dt.datetime.strftime(period_end,"%Y-%m-%d %H:%M:%S")
-            # print(period_start,period_end)
-            df_index_period=df_index.loc[period_start:period_end]
-            #对于选取1天的情况，可能出现的问题
-            if df_index_period.shape[0]==0: continue
-            df_industry_period=df_industry.loc[period_start:period_end]
-            df_stock_period=df_stock.loc[period_start:period_end]
-            r2s,beta_indexs,beta_industrys=simple_cross_section_cal(df_stock_period,df_index_period,df_industry_period,full_code,total_num)
-            r2s_all.loc[period_start]=r2s
-            beta_indexs_all.loc[period_start]=beta_indexs
-            beta_industrys_all.loc[period_start]=beta_industrys
-
-        return r2s_all,beta_indexs_all,beta_industrys_all
-
     else:
         raise ValueError(f"method {method} not supported")
-
+    r2s_all=pd.DataFrame(columns=range(total_num))
+    betas_dict={col:pd.DataFrame(columns=range(total_num)) for col in X_cols}
+    
+    workday_list=[date for date in workday_list if date>=start.date()]
+    for period_start,period_end in zip(workday_list[::period],workday_list[period::period]):
+        # print(period_start,period_end)
+        # print(df_X)
+        # 对于pd.date_range(start,end) 包含start和end 因此在选择的时候需要不包含end中的日期
+        # period_end=dt.datetime.strptime(str(period_start),"%Y-%m-%d %H:%M:%S")+dt.timedelta(days=period)-dt.timedelta(seconds=1)
+        # period_end=dt.datetime.strftime(period_end,"%Y-%m-%d %H:%M:%S")
+        # print(period_start,period_end)
+        df_X_period=df_X.loc[pd.Timestamp(period_start):pd.Timestamp(period_end)]
+        #对于选取1天的情况，可能出现的问题
+        if df_X_period.shape[0]==0: continue
+        df_stock_period=df_stock.loc[pd.Timestamp(period_start):pd.Timestamp(period_end)]
+        
+        # df_stock_period.to_csv(f'temp/{period_start.date()}_{period_end.date()}.csv')
+        if method=="simple":
+            cal_result=simple_cal(df_stock_period,df_X_period,full_code)
+            r2s_all.loc[period_start,0]=cal_result["r2"]
+            for col in X_cols:
+                betas_dict[col].loc[period_start,0]=cal_result["betas"][col]
+        elif method=="cross_section":
+            cal_result=simple_cross_section_cal(df_stock_period,df_X_period,full_code,total_num)
+            r2s_all.loc[period_start]=cal_result["r2"]
+            for col in X_cols:
+                betas_dict[col].loc[period_start]=cal_result["betas"][col]
+    
+    return {"r2":r2s_all,"betas":betas_dict}
+    
 
 if __name__=="__main__":
-    start=dt.datetime(2024,1,1)
-    end=dt.datetime(2024,12,31)
+    start=dt.datetime(2024,1,2)
+    end=dt.datetime(2024,1,12)
     freq="5min"
     df_index,workday_list,_=get_complete_return(full_code="SH000300",start=start,end=end,freq=freq,workday_list=None,is_index=True)
-    # print(workday_list)
+    print(workday_list)
     df_industry,_,error_list=get_complete_return(full_code="SH000070",start=start,end=end,freq=freq,workday_list=workday_list,is_index=True)
 
+    
     method="simple"
     # for period in ["full","10"]:
-    period="90"
+    period="3"
     # for full_code in [""]
     full_code="SZ002352"
     print(full_code)
     # results=single_periodic_cal(full_code=full_code,df_index=df_index,df_industry=df_industry,start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
     # results.to_csv(f'test_results_{period}_{method}.csv')
         
-    method="cross_section"
+    # method="cross_section"
     # for period in ["full","10d"]:
-    results=single_periodic_cal(full_code="SH600027",df_index=df_index,df_industry=df_industry,start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
-    results[0].to_csv(f'test_results_{period}_{method}.csv')
+    
+    df_X=pd.concat([df_index,df_industry],axis=1)
+    df_X.columns=["index","industry"]
+    # print(df_X)
+    # X_cols=["index"]
+    # df_X=pd.DataFrame(df_index)
+    # df_X.columns=X_cols
+
+    results=single_periodic_cal(full_code="SH600027",df_X=df_X,start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
+    results["r2"].to_csv(f'test_results_{period}_{method}.csv')
+    results["betas"]["index"].to_csv(f'test_betas_index_{period}_{method}.csv')
+    # results["betas"]["industry"].to_csv(f'test_betas_industry_{period}_{method}.csv')

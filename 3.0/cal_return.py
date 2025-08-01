@@ -2,6 +2,10 @@ import pandas as pd
 from get_data import get_data
 from resample import resample
 import datetime as dt
+import warnings
+
+# 设置warnings过滤，将RuntimeWarning设置为ignore模式
+warnings.filterwarnings('ignore', category=RuntimeWarning)
 
 def cal_return(df) -> pd.Series:
     """
@@ -49,13 +53,14 @@ def get_complete_return(full_code:str,start:dt.datetime,end:dt.datetime,freq:str
     num_code=full_code[2:]
 
     # 提前一天，不然会有first数据缺失，这里需要计算过程中自行注意，当遇到假期的时候依然有可能会失效
-    start_tmp=pd.Timestamp(start)-dt.timedelta(days=3)
+    start_tmp=pd.Timestamp(start)-dt.timedelta(days=4)
     
     df_get_data=get_data(start=start_tmp,end=end,exg=exg,full_code=full_code,workday_list=workday_list)
+    
     df_stock=df_get_data[0]
-
     workday_list=df_get_data[1]
     error_list=df_get_data[2]
+    
     if df_stock is None:
         return None,workday_list,error_list
     df_resample=resample(df_stock,freq=freq,is_index=is_index,stock_code=num_code,workday_list=workday_list,error_list=error_list)
@@ -63,15 +68,17 @@ def get_complete_return(full_code:str,start:dt.datetime,end:dt.datetime,freq:str
 
     # 删除第一天
     df_return=df_return.loc[df_return.index.date>=start.date()]
+    # workday_list = [day for day in workday_list if day >= start.date()]
     return df_return,workday_list,error_list
 
 
 if __name__=="__main__":
     start=dt.datetime(2024,9,24)
     end=dt.datetime(2024,10,10)
-    df_index_return,workday_list,error_list=get_complete_return(full_code="SH000001",start=start,end=end,freq="10min",workday_list=None,is_index=True)
+    freq="12h"
+    df_index_return,workday_list,error_list=get_complete_return(full_code="SH000001",start=start,end=end,freq=freq,workday_list=None,is_index=True)
     df_index_return.to_csv("index_return_test.csv")
-    df_return,workday_list,error_list=get_complete_return(full_code="SH600000",start=start,end=end,freq="10min",workday_list=workday_list,is_index=False)
+    df_return,workday_list,error_list=get_complete_return(full_code="SH600000",start=start,end=end,freq=freq,workday_list=workday_list,is_index=False)
     # df_return.to_csv("return_test.csv")
     print(error_list)
     df_return.to_csv("return_test.csv")

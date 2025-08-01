@@ -13,7 +13,7 @@ def get_data(start:dt.datetime=None,end:dt.datetime=None,exg:str=None,full_code:
     exg: 交易所
     full_code: 指数代码，如SH000001
     :return:  一个DataFrame,共两列，共两列，index（’Time')是datetime格式，columns为Price
-                workday_list，以list形式存储，element为TimeStamp.date()的工作日        
+                workday_list，以list形式存储，element为TimeStamp.date()的工作日，如2024-01-01      
     """
     df_stock=pd.DataFrame()
     error_list=[]
@@ -34,8 +34,7 @@ def get_data(start:dt.datetime=None,end:dt.datetime=None,exg:str=None,full_code:
                 workday_list.append(date)
             except FileNotFoundError:
                 continue
-        
-        print(f'From {start.date()} to {end.date()} (included), there are {len(workday_list)} workdays.')
+
         workday_list=[start_time.date() for start_time in workday_list]
     else:
         
