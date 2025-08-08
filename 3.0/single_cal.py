@@ -12,7 +12,7 @@ from cal_return import get_complete_return
 import os
 
 def log_error(msg,full_code):
-    with open(f'error_list/{full_code}.txt', 'w', encoding='utf-8') as f:
+    with open(f'error_list/{full_code}.txt', 'a', encoding='utf-8') as f:
         f.write(msg + '\n')
 
 def parse_timedelta(time_str):
@@ -74,32 +74,41 @@ def parse_timedelta(time_str):
         # 不支持的时间单位，抛出异常
         raise ValueError(f"Unsupported period: {time_str}")
 
+def convert_freq_to_min(str):
+    if str.endswith("min"):
+        return int(str[:-3])
+    elif str=="12h":
+        return 240
+    else:
+        raise ValueError(f"Unsupported freq: {str}")
+
 def simple_cal(df_stock,df_X,full_code):
     # 无法回归
     # df_index=df_X.iloc[:,0]
-    if df_X.shape[0] <= 1:
+    if df_X.shape[0] <= 1 or df_stock.shape[0]<=1:
         nan_series = pd.Series(np.nan, index=df_X.columns)
         return {"r2": np.nan, "betas": nan_series}
     # if len(X_names)>1:
         # df_industry=df_X.iloc[:,1]
     # 数据对齐
-
+    # print(df_stock.index)
+    # print(df_X.index)
 
     if df_stock.shape[0]<df_X.shape[0]:
         log_error(f'{full_code} 数据长度不一致,start:{df_X.index[0]},end:{df_X.index[-1]}',full_code)
         log_error(f'stock_length:{df_stock.shape[0]},index_length:{df_X.shape[0]}',full_code)
         missing_set=set(df_X.index.values)-set(df_stock.index.values)
-        if len(missing_set)<3:
-            log_error(f'缺少的index为{missing_set}',full_code)
-        df_stock.to_csv(f'error_list/return/{full_code}.csv')
-        if df_stock.shape[0]<=1: return {"r2":np.nan,"betas":[np.nan for _ in df_X.columns]}
+        # if len(missing_set)<3:
+        log_error(f'缺少的index为{missing_set}',full_code)
+        # df_stock.to_csv(f'error_list/return/{full_code}.csv')
+
         df_X=df_X.loc[df_stock.index].copy()
         # df_industry=df_industry.loc[df_stock.index].copy() 
     elif df_stock.shape[0]>df_X.shape[0]:
         log_error(f'{full_code} 数据长度不一致,stock_length:{df_stock.shape[0]},index_length:{df_X.shape[0]}',full_code)
         missing_set=set(df_X.index.values)-set(df_stock.index.values)
-        if len(missing_set)<3:
-            log_error(f'缺少的index为{missing_set}',full_code)
+        # if len(missing_set)<3:
+        log_error(f'缺少的index为{missing_set}',full_code)
         df_X=df_X.loc[df_stock.index].copy()
         # df_industry=df_industry.loc[df_stock.index].copy()
 
@@ -127,7 +136,7 @@ def simple_cross_section_cal(df_stock,df_X,full_code,total_num):
 
     X_cols=df_X.columns
     betas_dict={col:pd.Series() for col in X_cols}
-    
+
 
     for nth in range(total_num):
         # for df in [df_stock_period,df_index_period,df_industry_period]:
@@ -161,13 +170,13 @@ def single_periodic_cal(full_code,df_X,start,end,freq,workday_list,period:int,me
         period=len(workday_list)-1
     else:
         period=int(period)
-    
+    # print(period)
     if method=="simple":
         total_num=1
         # r2s=pd.DataFrame(columns=[0])
         # betas_dict={col:pd.DataFrame(columns=[0]) for col in X_cols}
     elif method=="cross_section":
-        freq_num = int(''.join(filter(str.isdigit, str(freq))))
+        freq_num = convert_freq_to_min(freq)
         total_num = 240 // freq_num +1
     else:
         raise ValueError(f"method {method} not supported")
@@ -178,6 +187,7 @@ def single_periodic_cal(full_code,df_X,start,end,freq,workday_list,period:int,me
     for period_start,period_end in zip(workday_list[::period],workday_list[period::period]):
         # print(period_start,period_end)
         # print(df_X)
+        # print(df_stock)
         # 对于pd.date_range(start,end) 包含start和end 因此在选择的时候需要不包含end中的日期
         # period_end=dt.datetime.strptime(str(period_start),"%Y-%m-%d %H:%M:%S")+dt.timedelta(days=period)-dt.timedelta(seconds=1)
         # period_end=dt.datetime.strftime(period_end,"%Y-%m-%d %H:%M:%S")
@@ -203,19 +213,19 @@ def single_periodic_cal(full_code,df_X,start,end,freq,workday_list,period:int,me
     
 
 if __name__=="__main__":
-    start=dt.datetime(2024,1,2)
-    end=dt.datetime(2024,1,12)
-    freq="5min"
+    start=dt.datetime(2020,1,3)
+    end=dt.datetime(2020,12,30)
+    freq="12h"
     df_index,workday_list,_=get_complete_return(full_code="SH000300",start=start,end=end,freq=freq,workday_list=None,is_index=True)
-    print(workday_list)
-    df_industry,_,error_list=get_complete_return(full_code="SH000070",start=start,end=end,freq=freq,workday_list=workday_list,is_index=True)
+    # print(workday_list)
+    # df_industry,_,error_list=get_complete_return(full_code="SH000070",start=start,end=end,freq=freq,workday_list=workday_list,is_index=True)
 
     
-    method="simple"
+    method="cross_section"
     # for period in ["full","10"]:
-    period="3"
+    period="20"
     # for full_code in [""]
-    full_code="SZ002352"
+    full_code="SH603392"
     print(full_code)
     # results=single_periodic_cal(full_code=full_code,df_index=df_index,df_industry=df_industry,start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
     # results.to_csv(f'test_results_{period}_{method}.csv')
@@ -223,14 +233,14 @@ if __name__=="__main__":
     # method="cross_section"
     # for period in ["full","10d"]:
     
-    df_X=pd.concat([df_index,df_industry],axis=1)
-    df_X.columns=["index","industry"]
+    # df_X=pd.concat([df_index,df_industry],axis=1)
+    # df_X.columns=["index","industry"]
     # print(df_X)
-    # X_cols=["index"]
-    # df_X=pd.DataFrame(df_index)
-    # df_X.columns=X_cols
+    X_cols=["index"]
+    df_X=pd.DataFrame(df_index)
+    df_X.columns=X_cols
 
-    results=single_periodic_cal(full_code="SH600027",df_X=df_X,start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
+    results=single_periodic_cal(full_code=full_code,df_X=df_X,start=start,end=end,freq=freq,workday_list=workday_list,period=period,method=method)
     results["r2"].to_csv(f'test_results_{period}_{method}.csv')
     results["betas"]["index"].to_csv(f'test_betas_index_{period}_{method}.csv')
     # results["betas"]["industry"].to_csv(f'test_betas_industry_{period}_{method}.csv')

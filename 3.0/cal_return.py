@@ -3,11 +3,11 @@ from get_data import get_data
 from resample import resample
 import datetime as dt
 import warnings
-
+import os
 # 设置warnings过滤，将RuntimeWarning设置为ignore模式
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
-def cal_return(df) -> pd.Series:
+def cal_return(df,full_code) -> pd.Series:
     """
     计算股票收益率函数
     
@@ -46,6 +46,14 @@ def cal_return(df) -> pd.Series:
 
     df_return = df_return[~(df_return.index.time == pd.Timestamp("09:15:00").time())]
     
+    null_index=df_return[df_return.isna()].index
+    if len(null_index)>0:
+        print(f"{full_code} with {len(null_index)} null index: {null_index}")
+        # print(df_return.loc[null_index])
+        with open(f'error_list/return/{full_code}.txt', 'a', encoding='utf-8') as f:
+            for index in null_index:
+                f.write(f'{index}\n')
+    df_return=df_return.dropna()
     return df_return
 
 def get_complete_return(full_code:str,start:dt.datetime,end:dt.datetime,freq:str,workday_list:list=None,is_index:bool=False):
@@ -64,7 +72,7 @@ def get_complete_return(full_code:str,start:dt.datetime,end:dt.datetime,freq:str
     if df_stock is None:
         return None,workday_list,error_list
     df_resample=resample(df_stock,freq=freq,is_index=is_index,stock_code=num_code,workday_list=workday_list,error_list=error_list)
-    df_return=cal_return(df_resample)
+    df_return=cal_return(df_resample,full_code)
 
     # 删除第一天
     df_return=df_return.loc[df_return.index.date>=start.date()]
@@ -73,8 +81,8 @@ def get_complete_return(full_code:str,start:dt.datetime,end:dt.datetime,freq:str
 
 
 if __name__=="__main__":
-    start=dt.datetime(2024,9,24)
-    end=dt.datetime(2024,10,10)
+    start=dt.datetime(2020,1,24)
+    end=dt.datetime(2020,10,10)
     freq="12h"
     df_index_return,workday_list,error_list=get_complete_return(full_code="SH000001",start=start,end=end,freq=freq,workday_list=None,is_index=True)
     df_index_return.to_csv("index_return_test.csv")

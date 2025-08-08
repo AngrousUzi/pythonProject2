@@ -51,7 +51,7 @@ def get_data(start:dt.datetime=None,end:dt.datetime=None,exg:str=None,full_code:
                 error_list.append(date)
                 continue
         if len(error_list)>0:
-            print(f"{full_code} on {error_list} is not found.")
+            print(f"{full_code} on {[str(date) for date in error_list]} is not found.")
             if not os.path.exists("error_list"):
                 os.makedirs("error_list")
             with open(f"error_list/{full_code}_missing_list.txt","w") as f:
@@ -70,9 +70,12 @@ def get_data(start:dt.datetime=None,end:dt.datetime=None,exg:str=None,full_code:
     return df_stock,workday_list,error_list
 
 if __name__=="__main__":
-    df=get_data(start=dt.datetime(2023,12,1),end=dt.datetime(2024,1,31),exg="SH",full_code="SH000001")
+    df=get_data(start=dt.datetime(2024,1,1),end=dt.datetime(2024,12,31),exg="SH",full_code="SH000001")
     df[0].to_csv("sample_index_1.csv")
     workday_list=df[1]
-    df=get_data(start=dt.datetime(2023,12,1),end=dt.datetime(2024,1,31),exg="SH",full_code="SH000070",workday_list=workday_list)
-    df[0].to_csv("sample_index_2.csv")
+    with open('workday_list.txt','w') as t:
+        for day in workday_list:
+            t.write(str(day)+"\n")
+    # df=get_data(start=dt.datetime(2023,12,1),end=dt.datetime(2024,1,31),exg="SH",full_code="SH000070",workday_list=workday_list)
+    # df[0].to_csv("sample_index_2.csv")
 

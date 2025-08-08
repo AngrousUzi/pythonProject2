@@ -112,14 +112,14 @@ def continue_cal(index_code,df_constant,X_cols,composites,start,end,freq,workday
     return sum_df(results_dict)     
 
 if __name__=="__main__":
-    start=dt.datetime(2024,1,3)
+    start=dt.datetime(2024,1,1)
     end=dt.datetime(2024,1,15)
-    freq="30min"
+    freq="5min"
     df_constant,composites,workday_list=prerequisite(index_code="SH000300",start=start,end=end,freq=freq)
     # print(composites)
     X_cols=["index"]
 #%%
-    results=all_cal(index_code="SH000300",df_constant=df_constant,X_cols=X_cols,composites=composites,start=start,end=end,freq=freq,workday_list=workday_list,period="3",method="simple")
+    results=all_cal(index_code="SH000300",df_constant=df_constant,X_cols=X_cols,composites=composites,start=start,end=end,freq=freq,workday_list=workday_list,period="1",method="simple")
     results.to_csv('test_results_all.csv')
 
     # results=continue_cal(index_code="SH000300",df_constant=df_constant,composites=composites,start=start,end=end,freq=freq,workday_list=workday_list,period="10",method="simple",continue_code="SZ002252")
